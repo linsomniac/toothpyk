@@ -21,7 +21,7 @@ def bytesToStr(bytes: int) -> str:
         return('[Invalid: "%s"]' % str(bytes))
 
 
-def send(args):
+def do_send(args):
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -43,7 +43,7 @@ def send(args):
     sys.stderr.write(f' {bytesToStr(bytes):20}\n')
 
 
-def receive(args):
+def do_receive(args):
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -68,7 +68,7 @@ def receive(args):
     sys.stderr.write(f' {bytesToStr(bytes):20}\n')
 
 
-def rsend(args):
+def do_rsend(args):
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -94,7 +94,7 @@ def rsend(args):
     sys.stderr.write(f' {bytesToStr(bytes):20}\n')
 
 
-def rreceive(args):
+def do_rreceive(args):
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -115,6 +115,11 @@ def rreceive(args):
     sys.stderr.write(f' {bytesToStr(bytes):20}\n')
 
 
+def do_eval(args):
+    cmd = ' '.join(args.rest)
+    print(eval(cmd))
+
+
 def main():
     # create the top-level parser
     parser = argparse.ArgumentParser()
@@ -125,28 +130,33 @@ def main():
     parser_send.add_argument('--input', '-i', nargs='?', type=argparse.FileType('rb'), default=sys.stdin.buffer)
     parser_send.add_argument('host')
     parser_send.add_argument('port', type=int)
-    parser_send.set_defaults(func=send)
+    parser_send.set_defaults(func=do_send)
 
     #  RECEIVE
     parser_send = subparsers.add_parser('receive')
     parser_send.add_argument('--output', '-o', nargs='?', type=argparse.FileType('wb'), default=sys.stdout.buffer)
     parser_send.add_argument('--host', default='')
     parser_send.add_argument('port', type=int)
-    parser_send.set_defaults(func=receive)
+    parser_send.set_defaults(func=do_receive)
 
     #  RSEND
-    parser_send = subparsers.add_parser('rsend')
-    parser_send.add_argument('--input', '-i', nargs='?', type=argparse.FileType('rb'), default=sys.stdin.buffer)
-    parser_send.add_argument('--host', default='')
-    parser_send.add_argument('port', type=int)
-    parser_send.set_defaults(func=rsend)
+    parser_rsend = subparsers.add_parser('rsend')
+    parser_rsend.add_argument('--input', '-i', nargs='?', type=argparse.FileType('rb'), default=sys.stdin.buffer)
+    parser_rsend.add_argument('--host', default='')
+    parser_rsend.add_argument('port', type=int)
+    parser_rsend.set_defaults(func=do_rsend)
 
     #  RRECEIVE
-    parser_send = subparsers.add_parser('rreceive')
-    parser_send.add_argument('--output', '-o', nargs='?', type=argparse.FileType('wb'), default=sys.stdout.buffer)
-    parser_send.add_argument('host')
-    parser_send.add_argument('port', type=int)
-    parser_send.set_defaults(func=rreceive)
+    parser_rreceive = subparsers.add_parser('rreceive')
+    parser_rreceive.add_argument('--output', '-o', nargs='?', type=argparse.FileType('wb'), default=sys.stdout.buffer)
+    parser_rreceive.add_argument('host')
+    parser_rreceive.add_argument('port', type=int)
+    parser_rreceive.set_defaults(func=do_rreceive)
+
+    #  eval
+    parser_eval = subparsers.add_parser('eval')
+    parser_eval.add_argument('rest', nargs='*')
+    parser_eval.set_defaults(func=do_eval)
 
     args = parser.parse_args()
     args.func(args)
