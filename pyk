@@ -8,20 +8,22 @@ import argparse
 import sys
 import socket
 import time
+import re
 
 
 def bytesToStr(bytes: int) -> str:
     try:
-        if (bytes > 1024000):
-            return("%.3fM" % ( bytes / 1024000.0 ));
-        if (bytes > 1024):
-            return("%.3fK" % ( bytes / 1024.0 ));
-        return("%dB" % ( bytes ));
+        if bytes > 1024000:
+            return "%.3fM" % (bytes / 1024000.0)
+        if bytes > 1024:
+            return "%.3fK" % (bytes / 1024.0)
+        return "%dB" % (bytes)
     except OverflowError:
-        return('[Invalid: "%s"]' % str(bytes))
+        return '[Invalid: "%s"]' % str(bytes)
 
 
 def do_send(args):
+    "Connect to a socket and send data to it."
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -38,12 +40,13 @@ def do_send(args):
         bytes = bytes + data_len
         now = int(time.time())
         if now != last:
-            sys.stderr.write(f' {bytesToStr(bytes):20}\r')
+            sys.stderr.write(f" {bytesToStr(bytes):20}\r")
         last = now
-    sys.stderr.write(f' {bytesToStr(bytes):20}\n')
+    sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
 def do_receive(args):
+    "Listen on a socket and when a connection comes in read data from it."
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -51,7 +54,7 @@ def do_receive(args):
     s.bind(addr)
     s.listen(1)
     conn, addr = s.accept()
-    sys.stderr.write('Connected by %s\n' % str(addr))
+    sys.stderr.write("Connected by %s\n" % str(addr))
 
     bytes = 0
     last = 0
@@ -63,12 +66,13 @@ def do_receive(args):
         bytes = bytes + len(data)
         now = int(time.time())
         if now != last:
-            sys.stderr.write(f' {bytesToStr(bytes):20}\r')
+            sys.stderr.write(f" {bytesToStr(bytes):20}\r")
         last = now
-    sys.stderr.write(f' {bytesToStr(bytes):20}\n')
+    sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
 def do_rsend(args):
+    "Listen on a socket and when a connection comes in send data to it."
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -76,7 +80,7 @@ def do_rsend(args):
     s.bind(addr)
     s.listen(1)
     conn, addr = s.accept()
-    sys.stderr.write('Connected by %s\n' % str(addr))
+    sys.stderr.write("Connected by %s\n" % str(addr))
     buf = bytearray(4096)
 
     bytes = 0
@@ -89,12 +93,13 @@ def do_rsend(args):
         bytes = bytes + data_len
         now = int(time.time())
         if now != last:
-            sys.stderr.write(f' {bytesToStr(bytes):20}\r')
+            sys.stderr.write(f" {bytesToStr(bytes):20}\r")
         last = now
-    sys.stderr.write(f' {bytesToStr(bytes):20}\n')
+    sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
 def do_rreceive(args):
+    "Connect to a socket and read data from it."
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -110,56 +115,136 @@ def do_rreceive(args):
         bytes = bytes + len(data)
         now = int(time.time())
         if now != last:
-            sys.stderr.write(f' {bytesToStr(bytes):20}\r')
+            sys.stderr.write(f" {bytesToStr(bytes):20}\r")
         last = now
-    sys.stderr.write(f' {bytesToStr(bytes):20}\n')
+    sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
 def do_eval(args):
-    cmd = ' '.join(args.rest)
+    "Evaluate a Python expression and return the result.  Can be used as a simple infix calculator."
+    cmd = " ".join(args.rest)
     print(eval(cmd))
+
+
+def do_rpncalc(args):
+    "An RPN desk calculator, use comma like Enter and 'x' can be used for multiply."
+    input = "".join(args.rest)
+
+    stack = []
+    operators = {
+        "x": lambda x, y: x * y,
+        "*": lambda x, y: x * y,
+        "/": lambda x, y: x / y,
+        "+": lambda x, y: x + y,
+        "-": lambda x, y: x - y,
+    }
+
+    def gen_ops(input):
+        rx = re.compile(
+            r"^((?P<number>[0-9]+(\.[0-9]*)?)|(?P<operator>[,x/+-]))(?P<rest>.*)$"
+        )
+        while input:
+            m = rx.match(input)
+            if not m:
+                raise ValueError('Could not understand "{input}"')
+            d = m.groupdict()
+            input = d["rest"]
+            if d["number"]:
+                yield float(d["number"]) if "." in d["number"] else int(d["number"])
+                continue
+            if d["operator"]:
+                yield d["operator"]
+
+    for x in gen_ops(input):
+        if x == ",":
+            pass
+        elif x in operators:
+            a = stack.pop()
+            b = stack.pop()
+            result = operators[x](b, a)
+            stack.append(result)
+        else:
+            stack.append(x)
+
+    print(stack[-1])
 
 
 def main():
     # create the top-level parser
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(required=True)
+    subparsers = parser.add_subparsers(required=True, title="Commands")
 
     #  SEND
-    parser_send = subparsers.add_parser('send')
-    parser_send.add_argument('--input', '-i', nargs='?', type=argparse.FileType('rb'), default=sys.stdin.buffer)
-    parser_send.add_argument('host')
-    parser_send.add_argument('port', type=int)
+    parser_send = subparsers.add_parser("send", help=do_send.__doc__)
+    parser_send.add_argument(
+        "--input",
+        "-i",
+        nargs="?",
+        type=argparse.FileType("rb"),
+        default=sys.stdin.buffer,
+    )
+    parser_send.add_argument("host")
+    parser_send.add_argument("port", type=int)
     parser_send.set_defaults(func=do_send)
 
     #  RECEIVE
-    parser_send = subparsers.add_parser('receive')
-    parser_send.add_argument('--output', '-o', nargs='?', type=argparse.FileType('wb'), default=sys.stdout.buffer)
-    parser_send.add_argument('--host', default='')
-    parser_send.add_argument('port', type=int)
+    parser_send = subparsers.add_parser(
+        "receive", aliases=["recv"], help=do_rreceive.__doc__
+    )
+    parser_send.add_argument(
+        "--output",
+        "-o",
+        nargs="?",
+        type=argparse.FileType("wb"),
+        default=sys.stdout.buffer,
+    )
+    parser_send.add_argument("--host", default="")
+    parser_send.add_argument("port", type=int)
     parser_send.set_defaults(func=do_receive)
 
     #  RSEND
-    parser_rsend = subparsers.add_parser('rsend')
-    parser_rsend.add_argument('--input', '-i', nargs='?', type=argparse.FileType('rb'), default=sys.stdin.buffer)
-    parser_rsend.add_argument('--host', default='')
-    parser_rsend.add_argument('port', type=int)
+    parser_rsend = subparsers.add_parser("rsend", help=do_rsend.__doc__)
+    parser_rsend.add_argument(
+        "--input",
+        "-i",
+        nargs="?",
+        type=argparse.FileType("rb"),
+        default=sys.stdin.buffer,
+    )
+    parser_rsend.add_argument("--host", default="")
+    parser_rsend.add_argument("port", type=int)
     parser_rsend.set_defaults(func=do_rsend)
 
     #  RRECEIVE
-    parser_rreceive = subparsers.add_parser('rreceive')
-    parser_rreceive.add_argument('--output', '-o', nargs='?', type=argparse.FileType('wb'), default=sys.stdout.buffer)
-    parser_rreceive.add_argument('host')
-    parser_rreceive.add_argument('port', type=int)
+    parser_rreceive = subparsers.add_parser(
+        "rreceive", aliases=["rrecv"], help=do_rreceive.__doc__
+    )
+    parser_rreceive.add_argument(
+        "--output",
+        "-o",
+        nargs="?",
+        type=argparse.FileType("wb"),
+        default=sys.stdout.buffer,
+    )
+    parser_rreceive.add_argument("host")
+    parser_rreceive.add_argument("port", type=int)
     parser_rreceive.set_defaults(func=do_rreceive)
 
-    #  eval
-    parser_eval = subparsers.add_parser('eval')
-    parser_eval.add_argument('rest', nargs='*')
+    #  EVAL
+    parser_eval = subparsers.add_parser("eval", aliases=["e"], help=do_eval.__doc__)
+    parser_eval.add_argument("rest", nargs="*")
     parser_eval.set_defaults(func=do_eval)
+
+    #  RPNCALC
+    parser_rc = subparsers.add_parser(
+        "rpncalc", aliases=["rc"], help=do_rpncalc.__doc__
+    )
+    parser_rc.add_argument("rest", nargs="*")
+    parser_rc.set_defaults(func=do_rpncalc)
 
     args = parser.parse_args()
     args.func(args)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
