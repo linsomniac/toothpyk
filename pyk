@@ -11,16 +11,20 @@ import time
 import re
 from typing import Union, Callable
 
+# create the top-level parser
+parser = argparse.ArgumentParser()
+subparsers = parser.add_subparsers(required=True, title="Commands")
+
 
 def func_to_help(func: Callable) -> Union[None, str]:
-    'Returns the first line of the docstr'
+    "Returns the first line of the docstr"
     if not func.__doc__:
         return None
-    return func.__doc__.split('\n')[0]
+    return func.__doc__.split("\n")[0]
 
 
 def func_to_desc(func: Callable) -> Union[None, str]:
-    'Returns the full docstring'
+    "Returns the full docstring"
     if not func.__doc__:
         return None
     return func.__doc__
@@ -38,7 +42,11 @@ def bytesToStr(bytes: int) -> str:
 
 
 def do_send(args):
-    "Connect to a socket and send data to it."
+    """Connect to a socket and send data to it.
+
+    This can connect to a remote socket and then send either stdin or a file
+    to teh remote socket.
+    """
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -58,6 +66,21 @@ def do_send(args):
             sys.stderr.write(f" {bytesToStr(bytes):20}\r")
         last = now
     sys.stderr.write(f" {bytesToStr(bytes):20}\n")
+
+
+subparser = subparsers.add_parser(
+    "send", help=func_to_help(do_send), description=func_to_desc(do_send)
+)
+subparser.add_argument(
+    "--input",
+    "-i",
+    nargs="?",
+    type=argparse.FileType("rb"),
+    default=sys.stdin.buffer,
+)
+subparser.add_argument("host")
+subparser.add_argument("port", type=int)
+subparser.set_defaults(func=do_send)
 
 
 def do_receive(args):
@@ -91,8 +114,30 @@ def do_receive(args):
     sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
+subparser = subparsers.add_parser(
+    "receive",
+    aliases=["recv"],
+    help=func_to_help(do_receive),
+    description=func_to_desc(do_receive),
+)
+subparser.add_argument(
+    "--output",
+    "-o",
+    nargs="?",
+    type=argparse.FileType("wb"),
+    default=sys.stdout.buffer,
+)
+subparser.add_argument("--host", default="")
+subparser.add_argument("port", type=int)
+subparser.set_defaults(func=do_receive)
+
+
 def do_rsend(args):
-    "Listen on a socket and when a connection comes in send data to it."
+    """Listen on a socket and when a connection comes in send data to it.
+
+    This is like "send" but with the listener on the other end (for diversity, if one
+    end is firewalled off).
+    """
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -118,8 +163,27 @@ def do_rsend(args):
     sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
+subparser = subparsers.add_parser(
+    "rsend", help=func_to_help(do_rsend), description=func_to_desc(do_rsend)
+)
+subparser.add_argument(
+    "--input",
+    "-i",
+    nargs="?",
+    type=argparse.FileType("rb"),
+    default=sys.stdin.buffer,
+)
+subparser.add_argument("--host", default="")
+subparser.add_argument("port", type=int)
+subparser.set_defaults(func=do_rsend)
+
+
 def do_rreceive(args):
-    "Connect to a socket and read data from it."
+    """Connect to a socket and read data from it.
+
+    This is like "receive" but data flowing the opposite direction.  This
+    is for use with "rsend".
+    """
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -140,14 +204,48 @@ def do_rreceive(args):
     sys.stderr.write(f" {bytesToStr(bytes):20}\n")
 
 
+subparser = subparsers.add_parser(
+    "rreceive",
+    aliases=["rrecv"],
+    help=func_to_help(do_rreceive),
+    description=func_to_desc(do_rreceive),
+)
+subparser.add_argument(
+    "--output",
+    "-o",
+    nargs="?",
+    type=argparse.FileType("wb"),
+    default=sys.stdout.buffer,
+)
+subparser.add_argument("host")
+subparser.add_argument("port", type=int)
+subparser.set_defaults(func=do_rreceive)
+
+
 def do_eval(args):
-    "Evaluate a Python expression and return the result.  Can be used as a simple infix calculator."
+    """Evaluate a Python expression and return the result.  Can be used as a simple infix calculator.
+
+    This implements the "EP" part of "REPL", evaluating short bits of Python, for example
+    dec/hex/oct conversion, simple calculations, etc...
+    """
     cmd = " ".join(args.rest)
     print(eval(cmd))
 
 
+subparser = subparsers.add_parser(
+    "eval", aliases=["e"], help=func_to_help(do_eval), description=func_to_desc(do_eval)
+)
+subparser.add_argument("rest", nargs="*")
+subparser.set_defaults(func=do_eval)
+
+
 def do_rpncalc(args):
-    "An RPN desk calculator, use comma like Enter and 'x' can be used for multiply."
+    """An RPN desk calculator, use comma like Enter and 'x' can be used for multiply.
+
+
+    An example computation would be "2,3*" or "2,3x" to multiply 2*3 ("x" to avoid
+    command-line globbing).  Also supports +, -, and /.
+    """
     input = "".join(args.rest)
 
     stack = []
@@ -161,7 +259,7 @@ def do_rpncalc(args):
 
     def gen_ops(input):
         rx = re.compile(
-            r"^((?P<number>[0-9]+(\.[0-9]*)?)|(?P<operator>[,x/+-]))(?P<rest>.*)$"
+            r"^((?P<number>[0-9]+(\.[0-9]*)?)|(?P<operator>[-,x/+*]))(?P<rest>.*)$"
         )
         while input:
             m = rx.match(input)
@@ -189,79 +287,17 @@ def do_rpncalc(args):
     print(stack[-1])
 
 
+subparser = subparsers.add_parser(
+    "rpncalc",
+    aliases=["rc"],
+    help=func_to_help(do_rpncalc),
+    description=func_to_desc(do_rpncalc),
+)
+subparser.add_argument("rest", nargs="*")
+subparser.set_defaults(func=do_rpncalc)
+
+
 def main():
-    # create the top-level parser
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(required=True, title="Commands")
-
-    #  SEND
-    subparser = subparsers.add_parser("send", help=func_to_help(do_send), description=func_to_desc(do_send))
-    subparser.add_argument(
-        "--input",
-        "-i",
-        nargs="?",
-        type=argparse.FileType("rb"),
-        default=sys.stdin.buffer,
-    )
-    subparser.add_argument("host")
-    subparser.add_argument("port", type=int)
-    subparser.set_defaults(func=do_send)
-
-    #  RECEIVE
-    subparser = subparsers.add_parser(
-        "receive", aliases=["recv"], help=func_to_help(do_receive), description=func_to_desc(do_receive)
-    )
-    subparser.add_argument(
-        "--output",
-        "-o",
-        nargs="?",
-        type=argparse.FileType("wb"),
-        default=sys.stdout.buffer,
-    )
-    subparser.add_argument("--host", default="")
-    subparser.add_argument("port", type=int)
-    subparser.set_defaults(func=do_receive)
-
-    #  RSEND
-    subparser = subparsers.add_parser("rsend", help=func_to_help(do_rsend), description=func_to_desc(do_rsend))
-    subparser.add_argument(
-        "--input",
-        "-i",
-        nargs="?",
-        type=argparse.FileType("rb"),
-        default=sys.stdin.buffer,
-    )
-    subparser.add_argument("--host", default="")
-    subparser.add_argument("port", type=int)
-    subparser.set_defaults(func=do_rsend)
-
-    #  RRECEIVE
-    subparser = subparsers.add_parser(
-        "rreceive", aliases=["rrecv"], help=func_to_help(do_rreceive), description=func_to_desc(do_rreceive)
-    )
-    subparser.add_argument(
-        "--output",
-        "-o",
-        nargs="?",
-        type=argparse.FileType("wb"),
-        default=sys.stdout.buffer,
-    )
-    subparser.add_argument("host")
-    subparser.add_argument("port", type=int)
-    subparser.set_defaults(func=do_rreceive)
-
-    #  EVAL
-    subparser = subparsers.add_parser("eval", aliases=["e"], help=func_to_help(do_eval), description=func_to_desc(do_eval))
-    subparser.add_argument("rest", nargs="*")
-    subparser.set_defaults(func=do_eval)
-
-    #  RPNCALC
-    subparser = subparsers.add_parser(
-        "rpncalc", aliases=["rc"], help=func_to_help(do_rpncalc), description=func_to_desc(do_rpncalc)
-    )
-    subparser.add_argument("rest", nargs="*")
-    subparser.set_defaults(func=do_rpncalc)
-
     args = parser.parse_args()
     args.func(args)
 
