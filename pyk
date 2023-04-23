@@ -11,6 +11,10 @@ import time
 import re
 from typing import Union, Callable
 
+class DocstringDescriptionFormatter(argparse.HelpFormatter):
+    def _fill_text(self, text, width, indent):
+        return '\n'.join([line.lstrip() for line in text.splitlines()])
+
 # create the top-level parser
 parser = argparse.ArgumentParser()
 subparsers = parser.add_subparsers(required=True, title="Commands")
@@ -45,7 +49,7 @@ def do_send(args):
     """Connect to a socket and send data to it.
 
     This can connect to a remote socket and then send either stdin or a file
-    to teh remote socket.
+    to the remote socket.
     """
     addr = (args.host, args.port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -69,7 +73,8 @@ def do_send(args):
 
 
 subparser = subparsers.add_parser(
-    "send", help=func_to_help(do_send), description=func_to_desc(do_send)
+    "send", help=func_to_help(do_send), description=func_to_desc(do_send),
+    formatter_class=DocstringDescriptionFormatter
 )
 subparser.add_argument(
     "--input",
@@ -119,6 +124,7 @@ subparser = subparsers.add_parser(
     aliases=["recv"],
     help=func_to_help(do_receive),
     description=func_to_desc(do_receive),
+    formatter_class=DocstringDescriptionFormatter
 )
 subparser.add_argument(
     "--output",
@@ -164,7 +170,8 @@ def do_rsend(args):
 
 
 subparser = subparsers.add_parser(
-    "rsend", help=func_to_help(do_rsend), description=func_to_desc(do_rsend)
+    "rsend", help=func_to_help(do_rsend), description=func_to_desc(do_rsend),
+    formatter_class=DocstringDescriptionFormatter
 )
 subparser.add_argument(
     "--input",
@@ -209,6 +216,7 @@ subparser = subparsers.add_parser(
     aliases=["rrecv"],
     help=func_to_help(do_rreceive),
     description=func_to_desc(do_rreceive),
+    formatter_class=DocstringDescriptionFormatter
 )
 subparser.add_argument(
     "--output",
@@ -233,7 +241,8 @@ def do_eval(args):
 
 
 subparser = subparsers.add_parser(
-    "eval", aliases=["e"], help=func_to_help(do_eval), description=func_to_desc(do_eval)
+    "eval", aliases=["e"], help=func_to_help(do_eval), description=func_to_desc(do_eval),
+    formatter_class=DocstringDescriptionFormatter
 )
 subparser.add_argument("rest", nargs="*")
 subparser.set_defaults(func=do_eval)
