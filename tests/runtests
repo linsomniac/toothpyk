@@ -1,0 +1,29 @@
+#!/bin/bash -eu
+#
+#  Tests for uPlaybook
+
+if [ -d .git ]; then
+  UP=$(pwd)/up
+  TESTDIR=$(pwd)/tests
+else
+  UP=$(pwd)/../up
+  TESTDIR=$(pwd)
+fi
+export UP
+export TESTDIR
+
+cd "$TESTDIR"
+for TEST in test_*; do
+  cd "$TESTDIR"
+  [ ! -f "$TEST"/run_test ] && continue
+  cd "$TESTDIR"/"$TEST"
+  echo "*** $TEST ***"
+  if ! ./run_test; then
+    echo "!!! TEST FAILED"
+    exit 1
+  fi
+done
+
+cd "$TESTDIR"
+python3 -m pytest
+exit "$?"

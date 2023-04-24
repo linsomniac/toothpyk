@@ -3,6 +3,7 @@
 #  A small multi-use tool for the command-line.
 #
 #  Sean Reifschneider 2023 <jafo00@gmail.com>
+#  License: CC0
 
 import argparse
 import sys
