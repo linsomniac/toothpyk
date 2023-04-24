@@ -106,15 +106,15 @@ subparser.set_defaults(func=do_eval)
 
 
 def do_modulefile(args):
-    """Print out the "__file__" attribute of the specified module.
-    """
+    """Print out the "__file__" attribute of the specified module."""
     exec(f"import {args.module}", locals(), globals())
     module = eval(f"{args.module}", locals(), globals())
     print(module.__file__)
 
 
 subparser = subparsers.add_parser(
-    "modulefile", aliases=["mf", "modfile"],
+    "modulefile",
+    aliases=["mf", "modfile"],
     help=func_to_help(do_modulefile),
     description=func_to_desc(do_modulefile),
     formatter_class=DocstringDescriptionFormatter,
@@ -378,16 +378,20 @@ subparser.set_defaults(func=do_rpncalc)
 def do_zoneoffset(args):
     """Print the current timezone offset from GMT."""
     if args.zoneoffsetonly:
-        print(time.strftime('%z'))
+        print(time.strftime("%z"))
     else:
-        print(time.strftime('%a %Y-%m-%d %H:%M:%S %Z %z'))
+        print(time.strftime("%a %Y-%m-%d %H:%M:%S %Z %z"))
+
 
 subparser = subparsers.add_parser(
-    "zoneoffset", aliases=["z"],
+    "zoneoffset",
+    aliases=["z"],
     help=func_to_help(do_zoneoffset),
     description=func_to_desc(do_zoneoffset),
 )
-subparser.add_argument("--zoneoffsetonly", action="store_true", help="Omit the time/date information")
+subparser.add_argument(
+    "--zoneoffsetonly", action="store_true", help="Omit the time/date information"
+)
 subparser.set_defaults(func=do_zoneoffset)
 
 
