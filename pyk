@@ -9,11 +9,15 @@ import sys
 import socket
 import time
 import re
+import os
+import subprocess
 from typing import Union, Callable
+
 
 class DocstringDescriptionFormatter(argparse.HelpFormatter):
     def _fill_text(self, text, width, indent):
-        return '\n'.join([line.lstrip() for line in text.splitlines()])
+        return "\n".join([line.lstrip() for line in text.splitlines()])
+
 
 # create the top-level parser
 parser = argparse.ArgumentParser()
@@ -45,6 +49,85 @@ def bytesToStr(bytes: int) -> str:
         return '[Invalid: "%s"]' % str(bytes)
 
 
+def do_allow(args):
+    """Allow a connection through the firewall.
+
+    Adds a firewall rule to allow connections, to make it easy for the send/receive
+    functions to work.
+    """
+    if os.geteuid() != 0:
+        print("ERROR: You need to use sudo")
+        sys.exit(1)
+    cmd = ["iptables"]
+    cmd.append("-D" if args.rm else "-I")
+    cmd.append("INPUT")
+    proto = "udp" if args.udp else "tcp"
+    cmd.extend(["-m", proto, "-p", proto])
+    cmd.extend(["--dport", str(args.port), "-j", "ACCEPT"])
+    subprocess.run(cmd)
+
+
+subparser = subparsers.add_parser(
+    "allow",
+    help=func_to_help(do_allow),
+    description=func_to_desc(do_allow),
+    formatter_class=DocstringDescriptionFormatter,
+)
+subparser.add_argument(
+    "--udp", action="store_true", help="If defined, allow a UDP port otherwise TCP."
+)
+subparser.add_argument(
+    "--rm", "-r", action="store_true", help="Remove the rule rather than adding it."
+)
+subparser.add_argument("port", type=int, help="The port to allow through the firewall.")
+subparser.set_defaults(func=do_allow)
+
+
+def do_eval(args):
+    """Evaluate a Python expression and return the result.  Can be used as a simple infix calculator.
+
+    This implements the "EP" part of "REPL", evaluating short bits of Python, for example
+    dec/hex/oct conversion, simple calculations, etc...
+    """
+    cmd = " ".join(args.rest)
+    print(eval(cmd))
+
+
+subparser = subparsers.add_parser(
+    "eval",
+    aliases=["e"],
+    help=func_to_help(do_eval),
+    description=func_to_desc(do_eval),
+    formatter_class=DocstringDescriptionFormatter,
+)
+subparser.add_argument("rest", nargs="*")
+subparser.set_defaults(func=do_eval)
+
+
+def do_modulefile(args):
+    """Print out the "__file__" attribute of the specified module.
+    """
+    exec(f"import {args.module}", locals(), globals())
+    module = eval(f"{args.module}", locals(), globals())
+    print(module.__file__)
+
+
+subparser = subparsers.add_parser(
+    "modulefile", aliases=["mf", "modfile"],
+    help=func_to_help(do_modulefile),
+    description=func_to_desc(do_modulefile),
+    formatter_class=DocstringDescriptionFormatter,
+)
+subparser.add_argument(
+    "--udp", action="store_true", help="If defined, allow a UDP port otherwise TCP."
+)
+subparser.add_argument(
+    "--rm", "-r", action="store_true", help="Remove the rule rather than adding it."
+)
+subparser.add_argument("module", help="A python module.")
+subparser.set_defaults(func=do_modulefile)
+
+
 def do_send(args):
     """Connect to a socket and send data to it.
 
@@ -73,8 +156,10 @@ def do_send(args):
 
 
 subparser = subparsers.add_parser(
-    "send", help=func_to_help(do_send), description=func_to_desc(do_send),
-    formatter_class=DocstringDescriptionFormatter
+    "send",
+    help=func_to_help(do_send),
+    description=func_to_desc(do_send),
+    formatter_class=DocstringDescriptionFormatter,
 )
 subparser.add_argument(
     "--input",
@@ -124,7 +209,7 @@ subparser = subparsers.add_parser(
     aliases=["recv"],
     help=func_to_help(do_receive),
     description=func_to_desc(do_receive),
-    formatter_class=DocstringDescriptionFormatter
+    formatter_class=DocstringDescriptionFormatter,
 )
 subparser.add_argument(
     "--output",
@@ -170,8 +255,10 @@ def do_rsend(args):
 
 
 subparser = subparsers.add_parser(
-    "rsend", help=func_to_help(do_rsend), description=func_to_desc(do_rsend),
-    formatter_class=DocstringDescriptionFormatter
+    "rsend",
+    help=func_to_help(do_rsend),
+    description=func_to_desc(do_rsend),
+    formatter_class=DocstringDescriptionFormatter,
 )
 subparser.add_argument(
     "--input",
@@ -216,7 +303,7 @@ subparser = subparsers.add_parser(
     aliases=["rrecv"],
     help=func_to_help(do_rreceive),
     description=func_to_desc(do_rreceive),
-    formatter_class=DocstringDescriptionFormatter
+    formatter_class=DocstringDescriptionFormatter,
 )
 subparser.add_argument(
     "--output",
@@ -230,27 +317,8 @@ subparser.add_argument("port", type=int)
 subparser.set_defaults(func=do_rreceive)
 
 
-def do_eval(args):
-    """Evaluate a Python expression and return the result.  Can be used as a simple infix calculator.
-
-    This implements the "EP" part of "REPL", evaluating short bits of Python, for example
-    dec/hex/oct conversion, simple calculations, etc...
-    """
-    cmd = " ".join(args.rest)
-    print(eval(cmd))
-
-
-subparser = subparsers.add_parser(
-    "eval", aliases=["e"], help=func_to_help(do_eval), description=func_to_desc(do_eval),
-    formatter_class=DocstringDescriptionFormatter
-)
-subparser.add_argument("rest", nargs="*")
-subparser.set_defaults(func=do_eval)
-
-
 def do_rpncalc(args):
     """An RPN desk calculator, use comma like Enter and 'x' can be used for multiply.
-
 
     An example computation would be "2,3*" or "2,3x" to multiply 2*3 ("x" to avoid
     command-line globbing).  Also supports +, -, and /.
@@ -298,12 +366,28 @@ def do_rpncalc(args):
 
 subparser = subparsers.add_parser(
     "rpncalc",
-    aliases=["rc"],
+    aliases=["rc", "rpn"],
     help=func_to_help(do_rpncalc),
     description=func_to_desc(do_rpncalc),
 )
 subparser.add_argument("rest", nargs="*")
 subparser.set_defaults(func=do_rpncalc)
+
+
+def do_zoneoffset(args):
+    """Print the current timezone offset from GMT."""
+    if args.zoneoffsetonly:
+        print(time.strftime('%z'))
+    else:
+        print(time.strftime('%a %Y-%m-%d %H:%M:%S %Z %z'))
+
+subparser = subparsers.add_parser(
+    "zoneoffset", aliases=["z"],
+    help=func_to_help(do_zoneoffset),
+    description=func_to_desc(do_zoneoffset),
+)
+subparser.add_argument("--zoneoffsetonly", action="store_true", help="Omit the time/date information")
+subparser.set_defaults(func=do_zoneoffset)
 
 
 def main():
