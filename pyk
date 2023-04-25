@@ -106,7 +106,7 @@ subparser.set_defaults(func=do_eval)
 
 
 def do_modulefile(args):
-    """Print out the "__file__" attribute of the specified module."""
+    """Print out the "__file__" attribute of the specified module, so you can take a peek at the source."""
     exec(f"import {args.module}", locals(), globals())
     module = eval(f"{args.module}", locals(), globals())
     print(module.__file__)
