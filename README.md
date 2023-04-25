@@ -10,7 +10,7 @@ your ~/bin directory to give you little tools.
 - eval (e)            Evaluate a Python expression and return the result.
                     Can be used as a simple infix calculator.
 - modulefile (mf, modfile)
-                    Print out the "__file__" attribute of the specified
+                    Print out the "\_\_file\_\_" attribute of the specified
                     module.
 - send                Connect to a socket and send data to it.
 - receive (recv)      Listen on a socket and when a connection comes in read
