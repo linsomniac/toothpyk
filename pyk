@@ -12,6 +12,7 @@ import time
 import re
 import os
 import subprocess
+import random
 from typing import Union, Callable
 
 
@@ -47,7 +48,8 @@ def bytesToStr(bytes: int) -> str:
             return "%.3fK" % (bytes / 1024.0)
         return "%dB" % (bytes)
     except OverflowError:
-        return '[Invalid: "%s"]' % str(bytes)
+        pass
+    return '[Invalid: "%s"]' % str(bytes)
 
 
 def do_allow(args):
@@ -316,6 +318,31 @@ subparser.add_argument(
 subparser.add_argument("host")
 subparser.add_argument("port", type=int)
 subparser.set_defaults(func=do_rreceive)
+
+
+def do_random(args):
+    """Print out a random number."""
+    print(random.randint(args.min, args.max))
+
+
+subparser = subparsers.add_parser(
+    "random",
+    help=func_to_help(do_random),
+    description=func_to_desc(do_random),
+)
+subparser.add_argument(
+    "--min",
+    default=0,
+    type=int,
+    help="The smallest number that is generated." " (default 0).",
+)
+subparser.add_argument(
+    "--max",
+    default=100,
+    type=int,
+    help="The largest number that is generated." " (default 100).",
+)
+subparser.set_defaults(func=do_random)
 
 
 def do_rpncalc(args):
