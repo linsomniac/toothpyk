@@ -176,6 +176,92 @@ subparser.add_argument("port", type=int)
 subparser.set_defaults(func=do_send)
 
 
+def do_split(args):
+    """Filter to read stdin/file and print the specified columns."""
+    columns = []
+    for column in args.columns.split(","):
+        if column in ["*", "all"]:
+            columns = "*"
+            break
+        m = re.match(r"(\d*):(\d*)", column)
+        if m:
+            min, max = m.groups()
+            if min == "":
+                min = 0
+            else:
+                min = int(min) - 1
+            if max == "":
+                max = -1
+            else:
+                max = int(max)
+            columns.append((min, max))
+            continue
+        m = re.match(r"(\d*)", column)
+        if m:
+            columns.append(int(m.group(1)) - 1)
+            continue
+        raise ValueError(f"Invalid column specifier: '{column}'")
+
+    for line in args.input.readlines():
+        output = []
+        line = line.split()
+
+        def label(columns):
+            for i in range(len(columns)):
+                yield f"{i+1}:{columns[i]}"
+
+        if columns == "*":
+            output = line
+        else:
+            for column in columns:
+                if type(column) == tuple:
+                    min, max = column
+                    if max == -1:
+                        max = len(line)
+                    for x in range(min, max):
+                        try:
+                            output.append(line[x])
+                        except IndexError:
+                            pass
+                else:
+                    try:
+                        output.append(line[column])
+                    except IndexError:
+                        pass
+
+        if args.label:
+            output = label(output)
+        print(" ".join(output))
+
+
+subparser = subparsers.add_parser(
+    "split",
+    help=func_to_help(do_split),
+    description=func_to_desc(do_split),
+    formatter_class=DocstringDescriptionFormatter,
+)
+subparser.add_argument(
+    "columns",
+    help="The column specifier: a number (3) or a range (3:5), or a comma-separated "
+    "list (3,5,7:9).  Can be '*' or 'all' for all.",
+)
+subparser.add_argument(
+    "input",
+    nargs="?",
+    type=argparse.FileType("r"),
+    default=sys.stdin,
+    help="The input file to read, defaults to stdin.",
+)
+subparser.add_argument(
+    "--label",
+    "-l",
+    action="store_true",
+    help="Label the column numbers of the output, useful as a first pass instead of "
+    "counting columns.",
+)
+subparser.set_defaults(func=do_split)
+
+
 def do_receive(args):
     """Listen on a socket and when a connection comes in read data from it.
 

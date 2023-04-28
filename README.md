@@ -13,6 +13,8 @@ your ~/bin directory to give you little tools.
                     Print out the "__file__" attribute of the specified
                     module, so you can take a peek at the source.
 - send                Connect to a socket and send data to it.
+- split               Filter to read stdin/file and print the specified
+                    columns.
 - receive (recv)      Listen on a socket and when a connection comes in read
                     data from it.
 - rsend               Listen on a socket and when a connection comes in send
