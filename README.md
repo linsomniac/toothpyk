@@ -4,6 +4,23 @@ Think "Swiss Army Toothpick", a bunch of small, self-contained tools oriented to
 the python sysadmin.  Something you can "wget" onto a rescue image or download to
 your ~/bin directory to give you little tools.
 
+## Examples
+
+    $ pyk e 0o755
+    493
+    $ pyk e 'oct(493)'
+    0o755
+    $ pyk e '0.062*24*30'
+    44.64
+    $ pyk rpn 0.062,24,30xx
+    44.64
+    $ pyk modulefile argparse
+    /usr/lib/python3.10/argparse.py
+    $ pyk random --max 10000
+    2415
+    $ pyk zoneoffset
+    Sat 2023-04-29 10:38:26 MDT -0600
+
 ## Sub-commands
 
 - allow               Allow a connection through the firewall.
