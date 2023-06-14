@@ -1,0 +1,4 @@
+name = "toothpyk"
+version = "0.0.1"
+description = "A small command-line tool"
+authors = ["Sean Reifschneider <jafo00@gmail.com>"]

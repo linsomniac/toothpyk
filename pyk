@@ -13,6 +13,7 @@ import re
 import os
 import subprocess
 import random
+import string
 from typing import Union, Callable
 
 
@@ -129,6 +130,25 @@ subparser.add_argument(
 )
 subparser.add_argument("module", help="A python module.")
 subparser.set_defaults(func=do_modulefile)
+
+
+def do_password(args):
+    """Generate a random password.
+    """
+    bad_characters = '0O1l'
+    characters = [x for x in string.ascii_lowercase + string.ascii_uppercase + string.digits + "@%.:=+-/" if x not in bad_characters]
+    password = ''.join(random.choice(characters) for _ in range(args.length))
+    print(password)
+
+
+subparser = subparsers.add_parser(
+    "password",
+    aliases=["pw", "gpw"],
+    help=func_to_help(do_password),
+    description=func_to_desc(do_password),
+)
+subparser.add_argument("length", nargs="?", type=int, default=12, help="The length of the password to generate")
+subparser.set_defaults(func=do_password)
 
 
 def do_send(args):
